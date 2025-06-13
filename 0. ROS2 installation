@@ -47,9 +47,9 @@ echo "source /opt/ros/rolling/setup.bash" >> ~/.bashrc
 7. Verify Installation
 
 7.1 Start terminal
-source /opt/ros/rolling/setup.bash
+source /opt/ros/jazzy/setup.bash
 ros2 run demo_nodes_cpp talker
 
 7.2 In another terminal, you should see the talker publishing messages and the listener receiving them.
-source /opt/ros/rolling/setup.bash
+source /opt/ros/jazzy/setup.bash
 ros2 run demo_nodes_py listener
