@@ -1,6 +1,6 @@
 1. Strip down existing ubuntu desktop
 sudo apt remove -y libreoffice* thunderbird rhythmbox totem gnome-mahjongg gnome-mines gnome-sudoku cheese aisleriot \
-  gnome-calendar gnome-contacts gnome-maps gnome-weather gnome-clocks gnome-calculator transmission simple-scan shotwell 
+  gnome-calendar gnome-contacts gnome-maps gnome-weather gnome-clocks gnome-calculator transmission-gtk transmission-common simple-scan shotwell 
 
 1.1 clean up
 sudo apt autoremove -y
