@@ -2,11 +2,19 @@
 sudo apt remove -y libreoffice* thunderbird rhythmbox totem gnome-mahjongg gnome-mines gnome-sudoku cheese aisleriot \
   gnome-calendar gnome-contacts gnome-maps gnome-weather gnome-clocks gnome-calculator transmission-gtk transmission-common simple-scan shotwell 
 
-1.1 clean up
+1.1 Remove localiztion files, language support
+sudo apt remove -y $(dpkg -l | grep language-pack | grep -v 'en' | awk '{print $2}')
+sudo apt remove -y libreoffice-help-* libreoffice-l10n-* aspell* hunspell* mythes* hyphen*
+
+1.2 clean up
 sudo apt autoremove -y
 sudo apt clean
 
 
-1. Thonny
+2. Thonny
 sudo apt install -y thonny
+
+3. Enable ZRAM 
+sudo apt install zram-config
+
 
