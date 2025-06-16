@@ -1,93 +1,137 @@
 #!/bin/bash
 
-echo "Optimizing Ubuntu 24.04 for Raspberry Pi 5 (Desktop version)..."
+# Ubuntu Debloat Script
+set -e
 
-# Mark critical GUI packages to prevent removal
-echo "Marking essential GUI packages to protect them..."
-sudo apt-mark manual gdm3 gnome-shell gnome-session gnome-terminal \
-  gnome-control-center xorg xserver-xorg nautilus mutter \
-  gnome-settings-daemon gnome-keyring plymouth
+echo "=== Ubuntu Debloat ==="
+echo "This script removes optional bloatware safely."
+echo "Press Ctrl+C within 5 seconds to cancel..."
+sleep 5
 
-# Remove non-essential apps
-echo "Removing Firefox, Thunderbird, LibreOffice, and other unwanted applications..."
-sudo apt remove -y firefox thunderbird libreoffice* rhythmbox totem \
-  gnome-mahjongg gnome-mines gnome-sudoku cheese aisleriot \
-  transmission-gtk transmission-common simple-scan shotwell \
-  gnome-weather gnome-maps gnome-contacts gnome-calendar gnome-clocks gnome-calculator
-sudo snap remove firefox
-sudo snap remove thunderbird
+# 0. Create backup of current packages
+echo "Creating package backup..."
+mkdir -p ~/debloat_backups
+dpkg --get-selections > ~/debloat_backups/backup_$(date +%Y%m%d_%H%M%S).txt
 
-# Remove extra language packs and documentation
-echo "Removing non-English language packs and help files..."
-LANG_PACKS=$(dpkg -l | grep language-pack | grep -v 'en' | awk '{print $2}')
-if [[ ! -z "$LANG_PACKS" ]]; then
-  sudo apt remove -y $LANG_PACKS
+# 0.1 Protect essential GUI components
+echo "Marking essential desktop components as manually installed..."
+sudo apt-mark manual gnome-shell gnome-session gdm3 gnome-terminal nautilus xorg gnome-control-center gnome-settings-daemon mutter
+
+# Function to safely remove packages
+safe_remove() {
+    local packages="$1"
+    local description="$2"
+    
+    echo "Checking $description..."
+    for package in $packages; do
+        if dpkg -l | grep -q "^ii.*$package "; then
+            echo "  Removing: $package"
+            sudo apt remove --purge -y "$package" 2>/dev/null || echo "    Failed to remove $package (may be dependency)"
+        fi
+    done
+}
+
+# 1. Remove Games
+echo "=== Removing Games ==="
+GAMES="aisleriot gnome-mahjongg gnome-mines gnome-sudoku gnome-2048 four-in-a-row five-or-more hitori iagno lightsoff quadrapassel swell-foop tali tetravex"
+safe_remove "$GAMES" "games"
+
+# 2. Remove LibreOffice
+echo "=== Removing LibreOffice ==="
+read -p "Remove LibreOffice? (y/N): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    OFFICE_PACKAGES=$(dpkg -l | grep "^ii.*libreoffice" | awk '{print $2}' | tr '\n' ' ')
+    safe_remove "$OFFICE_PACKAGES" "LibreOffice"
 fi
-sudo apt remove -y libreoffice-help-* libreoffice-l10n-* aspell* hunspell* mythes* hyphen* gtk-doc-tools 2>/dev/null
 
-# Skip autoremove to avoid accidental GUI breakage
-echo "Skipping 'apt autoremove'. You can run 'sudo apt autoremove --dry-run' manually if needed."
+# 3. Remove Thunderbird
+echo "=== Removing Thunderbird ==="
+read -p "Remove Thunderbird email client? (y/N): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    THUNDER_PACKAGES=$(dpkg -l | grep "^ii.*thunderbird" | awk '{print $2}' | tr '\n' ' ')
+    safe_remove "$THUNDER_PACKAGES" "Thunderbird"
+fi
 
-# Install Chromium and Thonny
-echo "Installing Chromium and Thonny..."
-sudo apt install -y chromium-browser thonny
+# 4. Remove media applications
+echo "=== Removing Media Applications ==="
+read -p "Remove media apps (Rhythmbox, Totem, Cheese)? (y/N): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    MEDIA="rhythmbox totem cheese shotwell simple-scan"
+    safe_remove "$MEDIA" "media applications"
+fi
 
-# Enable ZRAM
-echo "Enabling ZRAM swap..."
-sudo apt install -y zram-config
+# 5. Remove optional GNOME apps
+echo "=== Removing Optional GNOME Apps ==="
+read -p "Remove optional GNOME apps (Weather, Maps, etc.)? (y/N): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    GNOME_OPTIONAL="gnome-weather gnome-maps gnome-music gnome-photos gnome-characters"
+    safe_remove "$GNOME_OPTIONAL" "optional GNOME apps"
+fi
 
-# Disable non-essential background services
-echo "Disabling background services..."
-sudo systemctl disable cups.service
-sudo systemctl disable bluetooth.service
-sudo systemctl disable avahi-daemon.service
+# 6. Remove Transmission
+echo "=== Removing Transmission ==="
+TRANSMISSION="transmission-gtk transmission-common"
+safe_remove "$TRANSMISSION" "Transmission torrent client"
 
-# Set CPU governor to performance
-echo "Setting CPU governor to performance..."
-sudo apt install -y cpufrequtils
-echo 'GOVERNOR="performance"' | sudo tee /etc/default/cpufrequtils
-echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+# 7. Handle Snap packages
+echo "=== Removing Snap Applications ==="
+if command -v snap &> /dev/null; then
+    SNAP_APPS="firefox thunderbird"
+    for app in $SNAP_APPS; do
+        if snap list | grep -q "^$app "; then
+            read -p "Remove snap $app? (y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                sudo snap remove "$app" || echo "Failed to remove snap $app"
+            fi
+        fi
+    done
+fi
 
-# Install monitoring tools
-echo "Installing system monitor..."
-sudo apt install -y htop
+# 8. Remove language packs (keep English)
+echo "=== Removing Non-English Language Packs ==="
+read -p "Remove non-English language packs? (y/N): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    LANG_PACKS=$(dpkg -l | grep "^ii.*language-pack-" | grep -v "language-pack-en" | awk '{print $2}' | tr '\n' ' ')
+    safe_remove "$LANG_PACKS" "non-English language packs"
+fi
 
-# Enable watchdog
-echo "Installing and starting watchdog..."
-sudo apt install -y watchdog
-sudo systemctl enable watchdog
-sudo systemctl start watchdog
+# 9. Install robotics/dev tools
+echo "=== Installing Robotics Essentials ==="
+read -p "Install development tools for robotics? (y/N): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    sudo apt update
+    sudo apt install -y \
+        htop \
+        vim \
+        git \
+        curl \
+        wget \
+        build-essential \
+        python3-pip \
+        python3-venv \
+        chromium-browser
+    sudo apt install -y thonny || echo "Thonny not available"
+fi
 
-# Limit journald log size
-echo "Limiting journald log size..."
-sudo sed -i '/^#SystemMaxUse=/c\SystemMaxUse=100M' /etc/systemd/journald.conf
-sudo systemctl restart systemd-journald
+# 10. Clean up
+echo "=== Cleaning Up ==="
+sudo apt autoremove -y
+sudo apt autoclean
 
-# Disable unused TTYs
-echo "Disabling extra virtual terminals..."
-for tty in {2..6}; do
-  sudo systemctl disable getty@tty$tty.service
-done
-
-# Final GUI health check
-echo "Checking and installing missing GUI components..."
-REQUIRED_PACKAGES=(
-  gdm3 gnome-shell gnome-session gnome-terminal
-  gnome-control-center xorg xserver-xorg nautilus mutter
-  gnome-settings-daemon gnome-keyring plymouth
-)
-
-for pkg in "${REQUIRED_PACKAGES[@]}"; do
-  if ! dpkg -s "$pkg" &> /dev/null; then
-    echo "$pkg is missing. Installing..."
-    sudo apt install -y "$pkg"
-  fi
-done
-
-sudo systemctl enable gdm3
-sudo systemctl set-default graphical.target
-
-echo "Optimization complete. Please reboot to apply all changes:"
-echo "    sudo reboot"
-
+# 11. Post-setup recommendation
+echo ""
+echo "=== Debloat Complete ==="
+echo "Backup saved to: ~/debloat_backups/"
+echo ""
+echo "To customize GNOME Dock, run this after login:"
+echo "  gsettings set org.gnome.shell favorite-apps \"['chromium-browser.desktop', 'org.gnome.Terminal.desktop', 'org.gnome.Nautilus.desktop', 'thonny.desktop']\""
+echo ""
+echo "Reboot recommended: sudo reboot"
 
