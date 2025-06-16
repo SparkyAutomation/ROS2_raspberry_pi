@@ -87,10 +87,6 @@ done
 sudo systemctl enable gdm3
 sudo systemctl set-default graphical.target
 
-# Dock pinning reminder (must be run from user session)
-echo "To pin Chromium, Thonny, Terminal, and Files to the dock, run the following AFTER logging into the desktop session:"
-echo "gsettings set org.gnome.shell favorite-apps \"['chromium-browser.desktop', 'org.gnome.Terminal.desktop', 'org.gnome.Nautilus.desktop', 'thonny.desktop']\""
-
 echo "Optimization complete. Please reboot to apply all changes:"
 echo "    sudo reboot"
 
