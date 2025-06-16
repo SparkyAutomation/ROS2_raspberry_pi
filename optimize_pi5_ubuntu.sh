@@ -1,70 +1,97 @@
 #!/bin/bash
 
-echo "Optimizing Ubuntu 24.04 for Raspberry Pi 5 (Desktop-Preserving Lean Setup)..."
+echo "Optimizing Ubuntu 24.04 for Raspberry Pi 5 (Desktop version)..."
 
-# 1. Remove heavy non-essential desktop apps
-echo "Removing Firefox, Thunderbird, LibreOffice, and other desktop bloat..."
+# Mark critical GUI packages to prevent removal
+echo "Marking essential GUI packages to protect them..."
+sudo apt-mark manual gdm3 gnome-shell gnome-session gnome-terminal \
+  gnome-control-center xorg xserver-xorg nautilus mutter \
+  gnome-settings-daemon gnome-keyring plymouth
+
+# Remove non-essential apps
+echo "Removing Firefox, Thunderbird, LibreOffice, and other unwanted applications..."
 sudo apt remove -y firefox thunderbird libreoffice* rhythmbox totem \
   gnome-mahjongg gnome-mines gnome-sudoku cheese aisleriot \
   transmission-gtk transmission-common simple-scan shotwell \
-  gnome-weather gnome-maps gnome-contacts gnome-calendar gnome-clocks \
-  gnome-logs gnome-disk-utility gnome-font-viewer gnome-system-monitor
+  gnome-weather gnome-maps gnome-contacts gnome-calendar gnome-clocks gnome-calculator
+sudo snap remove firefox
+sudo snap remove thunderbird
 
-# 1.1 Remove localization and help/documentation
-echo "Removing non-English language packs and documentation..."
-sudo apt remove -y $(dpkg -l | grep language-pack | grep -v 'en' | awk '{print $2}')
-sudo apt remove -y libreoffice-help-* libreoffice-l10n-* aspell* hunspell* mythes* hyphen* manpages-* doc-* gtk-doc-tools
+# Remove extra language packs and documentation
+echo "Removing non-English language packs and help files..."
+LANG_PACKS=$(dpkg -l | grep language-pack | grep -v 'en' | awk '{print $2}')
+if [[ ! -z "$LANG_PACKS" ]]; then
+  sudo apt remove -y $LANG_PACKS
+fi
+sudo apt remove -y libreoffice-help-* libreoffice-l10n-* aspell* hunspell* mythes* hyphen* gtk-doc-tools 2>/dev/null
 
-# 1.2 Clean up residuals
-echo "Cleaning up..."
-sudo apt autoremove -y
-sudo apt clean
+# Skip autoremove to avoid accidental GUI breakage
+echo "Skipping 'apt autoremove'. You can run 'sudo apt autoremove --dry-run' manually if needed."
 
-# 2. Install Chromium browser
-echo "Installing Chromium browser..."
-sudo apt install -y chromium-browser
+# Install Chromium and Thonny
+echo "Installing Chromium and Thonny..."
+sudo apt install -y chromium-browser thonny
 
-# 3. Install lightweight Python IDE
-echo "Installing Thonny..."
-sudo apt install -y thonny
-
-# 4. Enable compressed swap in RAM
-echo "Enabling ZRAM..."
+# Enable ZRAM
+echo "Enabling ZRAM swap..."
 sudo apt install -y zram-config
 
-# 5. Disable unneeded services
-echo "Disabling unnecessary background services..."
+# Disable non-essential background services
+echo "Disabling background services..."
 sudo systemctl disable cups.service
 sudo systemctl disable bluetooth.service
 sudo systemctl disable avahi-daemon.service
 
-# 6. Set CPU governor to performance
-echo "Setting CPU governor to performance mode..."
+# Set CPU governor to performance
+echo "Setting CPU governor to performance..."
 sudo apt install -y cpufrequtils
 echo 'GOVERNOR="performance"' | sudo tee /etc/default/cpufrequtils
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 
-# 7. Install performance monitoring tools
-echo "Installing htop, btop, iotop, and glances..."
-sudo apt install -y htop btop iotop glances
+# Install monitoring tools
+echo "Installing system monitor..."
+sudo apt install -y htop
 
-# 8. Enable watchdog
-echo "Configuring system watchdog..."
+# Enable watchdog
+echo "Installing and starting watchdog..."
 sudo apt install -y watchdog
 sudo systemctl enable watchdog
 sudo systemctl start watchdog
 
-# 9. Limit journald log size
+# Limit journald log size
 echo "Limiting journald log size..."
 sudo sed -i '/^#SystemMaxUse=/c\SystemMaxUse=100M' /etc/systemd/journald.conf
 sudo systemctl restart systemd-journald
 
-# 10. Disable unused TTYs
-echo "Disabling TTYs 2 through 6..."
+# Disable unused TTYs
+echo "Disabling extra virtual terminals..."
 for tty in {2..6}; do
   sudo systemctl disable getty@tty$tty.service
 done
 
-echo "Optimization complete. Desktop environment retained, performance improved."
-echo "Reboot your Raspberry Pi to apply all changes:"
+# Final GUI health check
+echo "Checking and installing missing GUI components..."
+REQUIRED_PACKAGES=(
+  gdm3 gnome-shell gnome-session gnome-terminal
+  gnome-control-center xorg xserver-xorg nautilus mutter
+  gnome-settings-daemon gnome-keyring plymouth
+)
+
+for pkg in "${REQUIRED_PACKAGES[@]}"; do
+  if ! dpkg -s "$pkg" &> /dev/null; then
+    echo "$pkg is missing. Installing..."
+    sudo apt install -y "$pkg"
+  fi
+done
+
+sudo systemctl enable gdm3
+sudo systemctl set-default graphical.target
+
+# Dock pinning reminder (must be run from user session)
+echo "To pin Chromium, Thonny, Terminal, and Files to the dock, run the following AFTER logging into the desktop session:"
+echo "gsettings set org.gnome.shell favorite-apps \"['chromium-browser.desktop', 'org.gnome.Terminal.desktop', 'org.gnome.Nautilus.desktop', 'thonny.desktop']\""
+
+echo "Optimization complete. Please reboot to apply all changes:"
 echo "    sudo reboot"
+
+
