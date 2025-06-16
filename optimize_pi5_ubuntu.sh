@@ -134,4 +134,4 @@ echo "To customize GNOME Dock, run this after login:"
 echo "  gsettings set org.gnome.shell favorite-apps \"['chromium-browser.desktop', 'org.gnome.Terminal.desktop', 'org.gnome.Nautilus.desktop', 'thonny.desktop']\""
 echo ""
 echo "Reboot recommended: sudo reboot"
-
+sudo usermod -aG dialout $USER
